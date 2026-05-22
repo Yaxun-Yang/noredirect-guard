@@ -325,6 +325,27 @@
     window.addEventListener('message', function (e) {
       if (e.data && e.data.__nrg === NONCE) show(e.data);
     });
+
+    /* ── URL watchdog: detect delayed redirects that bypass all
+       interceptors (e.g. window.location = url on browsers without
+       Navigation API). Checks every 500ms. ── */
+    const startOrigin = location.origin;
+    const prefixes = urlPrefix ? urlPrefix.split('\n').filter(Boolean) : [];
+    setInterval(function () {
+      if (location.origin !== startOrigin) {
+        /* We've been redirected to a different origin */
+        try { window.stop(); } catch (e) {}
+        history.back();
+        return;
+      }
+      if (prefixes.length > 0) {
+        const onPrefix = prefixes.some(function (p) { return location.href.startsWith(p); });
+        if (!onPrefix) {
+          try { window.stop(); } catch (e) {}
+          history.back();
+        }
+      }
+    }, 500);
   });
 
   /* ════════════════════════════════════════════════════════════════════
