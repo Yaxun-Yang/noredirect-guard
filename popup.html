@@ -78,7 +78,7 @@
       text-transform: uppercase;
       margin-bottom: 6px;
     }
-    #prefixInput {
+    #prefixList {
       width: 100%;
       box-sizing: border-box;
       background: #0f0f1e;
@@ -89,8 +89,10 @@
       font-size: 11px;
       outline: none;
       font-family: monospace;
+      resize: vertical;
+      min-height: 38px;
     }
-    #prefixInput:focus { border-color: #27ae60; }
+    #prefixList:focus { border-color: #27ae60; }
     .btn-row {
       display: flex;
       gap: 6px;
@@ -104,16 +106,14 @@
       font: 600 11px system-ui, sans-serif;
       flex: 1;
     }
-    #savePrefix { background: #27ae60; color: #fff; }
+    #addCurrent { background: #2980b9; color: #fff; }
     #clearPrefix { background: #333; color: #aaa; }
     #prefixStatus {
       margin-top: 5px;
       font-size: 11px;
       font-style: italic;
       color: #555;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -140,14 +140,14 @@
   <hr class="section-sep">
 
   <!-- URL Prefix Lock -->
-  <div class="section-label">URL Prefix Lock</div>
-  <div class="row-desc" style="margin-bottom:6px">Confine this window to a URL prefix</div>
-  <input type="text" id="prefixInput" placeholder="https://example.com/docs/">
+  <div class="section-label">Allowed Sites</div>
+  <div class="row-desc" style="margin-bottom:6px">Only allow navigation to these sites (one per line)</div>
+  <textarea id="prefixList" rows="3" placeholder="https://example.com/&#10;https://another-site.com/"></textarea>
   <div class="btn-row">
-    <button class="sm-btn" id="savePrefix">Set prefix</button>
-    <button class="sm-btn" id="clearPrefix">Clear</button>
+    <button class="sm-btn" id="addCurrent">+ Current site</button>
+    <button class="sm-btn" id="clearPrefix">Clear all</button>
   </div>
-  <div id="prefixStatus">No prefix set</div>
+  <div id="prefixStatus">No sites locked</div>
   <div style="font-size:10px;color:#444;margin-top:3px">Takes effect on next page load</div>
 
   <hr class="section-sep">

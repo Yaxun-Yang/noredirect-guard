@@ -50,12 +50,17 @@
     );
   }
 
-  /* Returns true if the URL is blocked by the prefix lock */
+  /* Returns true if the URL is blocked by the prefix lock.
+     urlPrefix may contain multiple newline-separated prefixes. */
   function isBlockedByPrefix(url) {
     if (!urlPrefix) return false;
     try {
       var resolved = new URL(String(url || ''), location.href).href;
-      return !resolved.startsWith(urlPrefix);
+      var prefixes = urlPrefix.split('\\n');
+      for (var i = 0; i < prefixes.length; i++) {
+        if (prefixes[i] && resolved.startsWith(prefixes[i])) return false;
+      }
+      return true; /* matches none of the allowed prefixes */
     } catch (ex) { return false; }
   }
 
@@ -449,15 +454,20 @@
     /* ── Safety net: if a redirect already landed us outside the prefix,
        stop the page and bounce back. This catches redirects that slip
        through before the injected interceptor receives the prefix
-       (e.g. window.location = url, HTTP redirects, etc.). ── */
-    if (urlPrefix && !location.href.startsWith(urlPrefix)) {
-      try { window.stop(); } catch (e) {}
-      if (history.length > 1) {
-        history.back();
-      } else {
-        location.replace(urlPrefix);
+       (e.g. window.location = url, HTTP redirects, etc.).
+       urlPrefix may contain multiple newline-separated prefixes. ── */
+    if (urlPrefix) {
+      const prefixes = urlPrefix.split('\n').filter(Boolean);
+      const allowed  = prefixes.some(function (p) { return location.href.startsWith(p); });
+      if (!allowed) {
+        try { window.stop(); } catch (e) {}
+        if (history.length > 1) {
+          history.back();
+        } else {
+          location.replace(prefixes[0]);
+        }
+        return; /* don't set up anything else on this banned page */
       }
-      return; /* don't set up anything else on this banned page */
     }
 
     /* Always send ctrl so injected script gets the latest urlPrefix */

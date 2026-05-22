@@ -1,11 +1,11 @@
-const toggle      = document.getElementById('toggle');
-const statusText  = document.getElementById('statusText');
-const statusBox   = document.getElementById('statusBox');
-const prefixInput = document.getElementById('prefixInput');
-const savePrefix  = document.getElementById('savePrefix');
-const clearPrefix = document.getElementById('clearPrefix');
+const toggle       = document.getElementById('toggle');
+const statusText   = document.getElementById('statusText');
+const statusBox    = document.getElementById('statusBox');
+const prefixList   = document.getElementById('prefixList');
+const addCurrent   = document.getElementById('addCurrent');
+const clearPrefix  = document.getElementById('clearPrefix');
 const prefixStatus = document.getElementById('prefixStatus');
-const mediaToggle = document.getElementById('mediaToggle');
+const mediaToggle  = document.getElementById('mediaToggle');
 
 function applyState(enabled) {
   toggle.checked = enabled;
@@ -20,35 +20,50 @@ function applyState(enabled) {
   }
 }
 
-function showPrefixStatus(prefix) {
-  if (prefix) {
-    const display = prefix.length > 32 ? prefix.slice(0, 29) + '...' : prefix;
-    prefixStatus.textContent = 'Active: ' + display;
-    prefixStatus.style.color = '#2ecc71';
-  } else {
-    prefixStatus.textContent = 'No prefix set';
-    prefixStatus.style.color = '#555';
-  }
+/* Parse, deduplicate, normalize prefix lines */
+function parsePrefixes(text) {
+  return text.split('\n')
+    .map(function (line) { return line.trim(); })
+    .filter(function (line) { return /^https?:\/\//i.test(line); })
+    .map(function (raw) {
+      try {
+        const u = new URL(raw);
+        let href = u.origin + u.pathname;
+        // Ensure trailing slash if the path has no file extension
+        const lastSeg = u.pathname.split('/').pop();
+        if (!lastSeg.includes('.') && !href.endsWith('/')) href += '/';
+        return href;
+      } catch (e) { return null; }
+    })
+    .filter(Boolean)
+    .filter(function (v, i, a) { return a.indexOf(v) === i; }); /* dedupe */
 }
 
-function normalizePrefix(raw) {
-  // Parse to validate and canonicalize the URL
-  const u = new URL(raw);
-  let href = u.href;
-  // If the path has no extension in the last segment and doesn't end with /, append /
-  const lastSeg = u.pathname.split('/').pop();
-  if (!lastSeg.includes('.') && !href.endsWith('/')) {
-    href += '/';
+function savePrefixes() {
+  const prefixes = parsePrefixes(prefixList.value);
+  const joined = prefixes.join('\n');
+  prefixList.value = joined;
+  chrome.storage.local.set({ urlPrefix: joined });
+  showPrefixStatus(prefixes);
+}
+
+function showPrefixStatus(prefixes) {
+  if (prefixes.length === 0) {
+    prefixStatus.textContent = 'No sites locked';
+    prefixStatus.style.color = '#555';
+  } else {
+    prefixStatus.textContent = prefixes.length + ' site' +
+      (prefixes.length > 1 ? 's' : '') + ' locked';
+    prefixStatus.style.color = '#2ecc71';
   }
-  return href;
 }
 
 /* Load saved state */
 chrome.storage.local.get(['enabled', 'urlPrefix', 'blockFloatingMedia'], function (result) {
   applyState(result.enabled !== false);
-  const prefix = result.urlPrefix || '';
-  prefixInput.value = prefix;
-  showPrefixStatus(prefix);
+  const raw = result.urlPrefix || '';
+  prefixList.value = raw;
+  showPrefixStatus(parsePrefixes(raw));
   mediaToggle.checked = result.blockFloatingMedia !== false;
 });
 
@@ -58,35 +73,32 @@ toggle.addEventListener('change', function () {
   applyState(enabled);
 });
 
-savePrefix.addEventListener('click', function () {
-  const raw = prefixInput.value.trim();
-  if (!raw) {
-    prefixStatus.textContent = 'Enter a URL first';
-    prefixStatus.style.color = '#e74c3c';
-    return;
-  }
-  if (!/^https?:\/\//i.test(raw)) {
-    prefixStatus.textContent = 'Must start with http:// or https://';
-    prefixStatus.style.color = '#e74c3c';
-    return;
-  }
-  let normalized;
-  try {
-    normalized = normalizePrefix(raw);
-  } catch (e) {
-    prefixStatus.textContent = 'Invalid URL';
-    prefixStatus.style.color = '#e74c3c';
-    return;
-  }
-  prefixInput.value = normalized;
-  chrome.storage.local.set({ urlPrefix: normalized });
-  showPrefixStatus(normalized);
+/* Auto-save when textarea loses focus */
+prefixList.addEventListener('blur', savePrefixes);
+
+/* Add current tab's origin to the list */
+addCurrent.addEventListener('click', function () {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (!tabs[0] || !tabs[0].url) return;
+    try {
+      const origin = new URL(tabs[0].url).origin + '/';
+      const existing = prefixList.value.trim();
+      // Check if already in the list
+      if (existing.split('\n').some(function (l) { return l.trim() === origin; })) {
+        prefixStatus.textContent = 'Already in list';
+        prefixStatus.style.color = '#f39c12';
+        return;
+      }
+      prefixList.value = existing ? existing + '\n' + origin : origin;
+      savePrefixes();
+    } catch (e) {}
+  });
 });
 
 clearPrefix.addEventListener('click', function () {
-  prefixInput.value = '';
+  prefixList.value = '';
   chrome.storage.local.set({ urlPrefix: '' });
-  showPrefixStatus('');
+  showPrefixStatus([]);
 });
 
 mediaToggle.addEventListener('change', function () {
