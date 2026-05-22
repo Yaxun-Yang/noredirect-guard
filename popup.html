@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 270px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font: 14px/1.5 -apple-system, system-ui, Arial, sans-serif;
+      padding: 16px;
+    }
+    header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #2a2a4e;
+      padding-bottom: 12px;
+    }
+    .shield { font-size: 24px; }
+    h1 { font-size: 15px; font-weight: 700; color: #fff; }
+    .sub { font-size: 11px; color: #888; margin-top: 1px; }
+
+    .row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .row-label { font-size: 13px; }
+    .row-desc  { font-size: 11px; color: #666; margin-top: 2px; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .switch input { display: none; }
+    .slider {
+      position: absolute; inset: 0;
+      background: #444; border-radius: 22px;
+      cursor: pointer; transition: background .2s;
+    }
+    .slider::before {
+      content: '';
+      position: absolute; left: 3px; top: 3px;
+      width: 16px; height: 16px;
+      background: #fff; border-radius: 50%;
+      transition: transform .2s;
+    }
+    input:checked + .slider { background: #27ae60; }
+    input:checked + .slider::before { transform: translateX(18px); }
+
+    .status-box {
+      margin-top: 10px;
+      background: #0f0f1e;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #888;
+      line-height: 1.6;
+    }
+    .status-box span { color: #2ecc71; font-weight: 600; }
+    .note {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.5;
+      border-top: 1px solid #2a2a4e;
+      padding-top: 10px;
+    }
+    .section-sep {
+      border: none;
+      border-top: 1px solid #2a2a4e;
+      margin: 10px 0 8px;
+    }
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #aaa;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    #prefixInput {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0f0f1e;
+      border: 1px solid #2a2a4e;
+      color: #e0e0e0;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      outline: none;
+      font-family: monospace;
+    }
+    #prefixInput:focus { border-color: #27ae60; }
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .sm-btn {
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font: 600 11px system-ui, sans-serif;
+      flex: 1;
+    }
+    #savePrefix { background: #27ae60; color: #fff; }
+    #clearPrefix { background: #333; color: #aaa; }
+    #prefixStatus {
+      margin-top: 5px;
+      font-size: 11px;
+      font-style: italic;
+      color: #555;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shield">🛡️</div>
+    <div>
+      <h1>NoRedirect Guard</h1>
+      <div class="sub">Auto-redirect blocker</div>
+    </div>
+  </header>
+
+  <div class="row">
+    <div>
+      <div class="row-label">Enable protection</div>
+      <div class="row-desc">Applies to all websites</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="toggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <hr class="section-sep">
+
+  <!-- URL Prefix Lock -->
+  <div class="section-label">URL Prefix Lock</div>
+  <div class="row-desc" style="margin-bottom:6px">Confine this window to a URL prefix</div>
+  <input type="text" id="prefixInput" placeholder="https://example.com/docs/">
+  <div class="btn-row">
+    <button class="sm-btn" id="savePrefix">Set prefix</button>
+    <button class="sm-btn" id="clearPrefix">Clear</button>
+  </div>
+  <div id="prefixStatus">No prefix set</div>
+  <div style="font-size:10px;color:#444;margin-top:3px">Takes effect on next page load</div>
+
+  <hr class="section-sep">
+
+  <!-- Block floating videos toggle -->
+  <div class="row" style="padding: 4px 0;">
+    <div>
+      <div class="row-label">Block floating videos</div>
+      <div class="row-desc">Hide fixed-position video overlays</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="mediaToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <hr class="section-sep">
+
+  <div class="status-box" id="statusBox">
+    Protection is <span id="statusText">active</span>.<br>
+    Redirects and popups will be blocked until you tap <em>Allow once</em>.
+  </div>
+
+  <div class="note">
+    Your own taps and clicks are never blocked. Only scripts that navigate
+    you automatically are intercepted.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
