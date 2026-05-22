@@ -107,8 +107,14 @@
     window.open = function (url, target, features) {
       if (!_enabled) return _open(url, target, features);
       var pb = isBlockedByPrefix(url);
-      if (!pb && userActive) return _open(url, target, features);
-      emit('popup', url, 'open', pb);
+      /* Always block cross-origin popups — ad scripts hijack user clicks
+         to window.open an ad alongside the real navigation. Same-origin
+         popups are allowed when user is active. */
+      var crossOrigin = false;
+      try { crossOrigin = new URL(String(url || ''), location.href).origin !== location.origin; }
+      catch (ex) {}
+      if (!pb && !crossOrigin && userActive) return _open(url, target, features);
+      emit('popup', url, 'open', pb || crossOrigin);
       return null;
     };
   } catch (e) {}
@@ -331,13 +337,13 @@
       catch (e) { return false; }
     }
 
-    /* Is this element a positioned overlay? (fixed, or absolute with high z-index) */
+    /* Is this element a positioned overlay? (fixed/sticky, or absolute with high z-index) */
     function isOverlay(el) {
       try {
         const st = window.getComputedStyle(el);
         if (st.display === 'none' || st.visibility === 'hidden') return false;
         const pos = st.position;
-        if (pos === 'fixed') return true;
+        if (pos === 'fixed' || pos === 'sticky') return true;
         if (pos === 'absolute') {
           const z = parseInt(st.zIndex, 10);
           return z >= 900;
@@ -357,14 +363,18 @@
       return root;
     }
 
-    /* Does this overlay contain content that links externally? */
+    /* Does this overlay contain content that links or loads externally? */
     function hasExternalContent(el) {
       /* External <a> links */
       for (const a of el.querySelectorAll('a[href]')) {
         if (isCrossOrigin(a.href)) return true;
       }
-      /* The element itself is an external link */
       if (el.tagName === 'A' && isCrossOrigin(el.href)) return true;
+      /* Cross-origin images (ad banners) */
+      for (const img of el.querySelectorAll('img[src]')) {
+        if (isCrossOrigin(img.src)) return true;
+      }
+      if (el.tagName === 'IMG' && isCrossOrigin(el.src)) return true;
       /* Cross-origin iframes */
       for (const f of el.querySelectorAll('iframe')) {
         const src = f.src || f.getAttribute('src') || '';
@@ -379,6 +389,21 @@
       return false;
     }
 
+    /* Is this a bottom-anchored overlay? (very likely an ad banner) */
+    function isBottomOverlay(el) {
+      try {
+        const rect = el.getBoundingClientRect();
+        const st   = window.getComputedStyle(el);
+        /* Fixed/sticky at the bottom half of the viewport with images inside */
+        if ((st.position === 'fixed' || st.position === 'sticky') &&
+            rect.bottom > window.innerHeight * 0.5 &&
+            (el.querySelector('img') || el.querySelector('canvas'))) {
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
     function shouldHide(overlayEl) {
       if (processed.has(overlayEl)) return false;
       const rect = overlayEl.getBoundingClientRect();
@@ -389,7 +414,8 @@
           rect.height > window.innerHeight * 0.9) return false;
       /* Skip our own notification bar host */
       if (overlayEl === host) return false;
-      return hasExternalContent(overlayEl);
+      /* Block if it has external content OR is a bottom-anchored image overlay */
+      return hasExternalContent(overlayEl) || isBottomOverlay(overlayEl);
     }
 
     function hideEl(el) {
@@ -412,10 +438,10 @@
     }
 
     function sweep() {
-      /* Check media & iframes via ancestor walk */
-      document.querySelectorAll('video, iframe, a[href]').forEach(checkEl);
+      /* Check media, images & links via ancestor walk */
+      document.querySelectorAll('video, iframe, img, a[href]').forEach(checkEl);
       /* Directly check elements with inline position styles */
-      document.querySelectorAll('[style*="fixed"], [style*="absolute"]').forEach(checkOverlay);
+      document.querySelectorAll('[style*="fixed"], [style*="absolute"], [style*="sticky"]').forEach(checkOverlay);
     }
 
     const obs = new MutationObserver(function (mutations) {
@@ -425,8 +451,8 @@
           checkOverlay(node);
           checkEl(node);
           if (node.querySelectorAll) {
-            node.querySelectorAll('video, iframe, a[href]').forEach(checkEl);
-            node.querySelectorAll('[style*="fixed"], [style*="absolute"]').forEach(checkOverlay);
+            node.querySelectorAll('video, iframe, img, a[href]').forEach(checkEl);
+            node.querySelectorAll('[style*="fixed"], [style*="absolute"], [style*="sticky"]').forEach(checkOverlay);
           }
         }
       }
