@@ -92,7 +92,21 @@
       resize: vertical;
       min-height: 38px;
     }
-    #prefixList:focus { border-color: #27ae60; }
+    #prefixList:focus, #blockedList:focus { border-color: #27ae60; }
+    #blockedList {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0f0f1e;
+      border: 1px solid #2a2a4e;
+      color: #e0e0e0;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      outline: none;
+      font-family: monospace;
+      resize: vertical;
+      min-height: 38px;
+    }
     .btn-row {
       display: flex;
       gap: 6px;
@@ -163,6 +177,17 @@
       <span class="slider"></span>
     </label>
   </div>
+
+  <hr class="section-sep">
+
+  <!-- Blocked sites list -->
+  <div class="section-label">Blocked Sites</div>
+  <div class="row-desc" style="margin-bottom:6px">Auto-collected. Landing on these = instant back.</div>
+  <textarea id="blockedList" rows="3" placeholder="(domains added automatically when redirects are blocked)"></textarea>
+  <div class="btn-row">
+    <button class="sm-btn" id="clearBlocked" style="background:#333;color:#aaa">Clear all</button>
+  </div>
+  <div id="blockedStatus" style="margin-top:5px;font-size:11px;font-style:italic;color:#555">0 domains blocked</div>
 
   <hr class="section-sep">
 

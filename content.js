@@ -295,10 +295,41 @@
     clearTimeout(hideTimer);
   }
 
-  chrome.storage.local.get(['enabled', 'urlPrefix', 'blockFloatingMedia'], function (result) {
+  /* Auto-add a domain to the blocked sites list in storage */
+  function addToBlocklist(url) {
+    try {
+      const domain = new URL(url, location.href).hostname.toLowerCase();
+      if (!domain || domain === location.hostname) return;
+      chrome.storage.local.get(['blockedSites'], function (r) {
+        const existing = (r.blockedSites || '').split('\n').filter(Boolean);
+        if (existing.indexOf(domain) !== -1) return; /* already listed */
+        existing.push(domain);
+        chrome.storage.local.set({ blockedSites: existing.join('\n') });
+      });
+    } catch (e) {}
+  }
+
+  chrome.storage.local.get(
+    ['enabled', 'urlPrefix', 'blockFloatingMedia', 'blockedSites'],
+    function (result) {
     const enabled            = result.enabled !== false;
     const urlPrefix          = result.urlPrefix || '';
     const blockFloatingMedia = result.blockFloatingMedia !== false;
+    const blockedSites       = (result.blockedSites || '').split('\n').filter(Boolean);
+
+    /* ── Blocklist check: if current domain is blocked, bounce back ── */
+    const curHost = location.hostname.toLowerCase();
+    if (blockedSites.some(function (d) { return curHost === d || curHost.endsWith('.' + d); })) {
+      try { window.stop(); } catch (e) {}
+      if (history.length > 1) {
+        history.back();
+      } else {
+        /* Fall back to first allowed prefix, or about:blank */
+        const prefixes = urlPrefix ? urlPrefix.split('\n').filter(Boolean) : [];
+        location.replace(prefixes[0] || 'about:blank');
+      }
+      return;
+    }
 
     /* Safety net: if we landed outside the prefix, bounce back */
     if (urlPrefix) {
@@ -322,18 +353,21 @@
 
     if (!enabled) return;
 
+    /* Listen for blocked redirects — show notification + auto-add to blocklist */
     window.addEventListener('message', function (e) {
-      if (e.data && e.data.__nrg === NONCE) show(e.data);
+      if (e.data && e.data.__nrg === NONCE) {
+        show(e.data);
+        /* Auto-add the blocked destination domain to the blocklist */
+        if (e.data.url) addToBlocklist(e.data.url);
+      }
     });
 
     /* ── URL watchdog: detect delayed redirects that bypass all
-       interceptors (e.g. window.location = url on browsers without
-       Navigation API). Checks every 500ms. ── */
+       interceptors. Checks every 500ms. ── */
     const startOrigin = location.origin;
     const prefixes = urlPrefix ? urlPrefix.split('\n').filter(Boolean) : [];
     setInterval(function () {
       if (location.origin !== startOrigin) {
-        /* We've been redirected to a different origin */
         try { window.stop(); } catch (e) {}
         history.back();
         return;

@@ -1,11 +1,14 @@
-const toggle       = document.getElementById('toggle');
-const statusText   = document.getElementById('statusText');
-const statusBox    = document.getElementById('statusBox');
-const prefixList   = document.getElementById('prefixList');
-const addCurrent   = document.getElementById('addCurrent');
-const clearPrefix  = document.getElementById('clearPrefix');
-const prefixStatus = document.getElementById('prefixStatus');
-const mediaToggle  = document.getElementById('mediaToggle');
+const toggle        = document.getElementById('toggle');
+const statusText    = document.getElementById('statusText');
+const statusBox     = document.getElementById('statusBox');
+const prefixList    = document.getElementById('prefixList');
+const addCurrent    = document.getElementById('addCurrent');
+const clearPrefix   = document.getElementById('clearPrefix');
+const prefixStatus  = document.getElementById('prefixStatus');
+const mediaToggle   = document.getElementById('mediaToggle');
+const blockedList   = document.getElementById('blockedList');
+const clearBlocked  = document.getElementById('clearBlocked');
+const blockedStatus = document.getElementById('blockedStatus');
 
 function applyState(enabled) {
   toggle.checked = enabled;
@@ -29,14 +32,13 @@ function parsePrefixes(text) {
       try {
         const u = new URL(raw);
         let href = u.origin + u.pathname;
-        // Ensure trailing slash if the path has no file extension
         const lastSeg = u.pathname.split('/').pop();
         if (!lastSeg.includes('.') && !href.endsWith('/')) href += '/';
         return href;
       } catch (e) { return null; }
     })
     .filter(Boolean)
-    .filter(function (v, i, a) { return a.indexOf(v) === i; }); /* dedupe */
+    .filter(function (v, i, a) { return a.indexOf(v) === i; });
 }
 
 function savePrefixes() {
@@ -58,14 +60,42 @@ function showPrefixStatus(prefixes) {
   }
 }
 
+/* Parse blocklist: one domain per line, trimmed, deduped */
+function parseBlocked(text) {
+  return text.split('\n')
+    .map(function (l) { return l.trim().toLowerCase(); })
+    .filter(Boolean)
+    .filter(function (v, i, a) { return a.indexOf(v) === i; });
+}
+
+function saveBlocked() {
+  const domains = parseBlocked(blockedList.value);
+  const joined = domains.join('\n');
+  blockedList.value = joined;
+  chrome.storage.local.set({ blockedSites: joined });
+  showBlockedStatus(domains);
+}
+
+function showBlockedStatus(domains) {
+  blockedStatus.textContent = domains.length + ' domain' +
+    (domains.length !== 1 ? 's' : '') + ' blocked';
+  blockedStatus.style.color = domains.length > 0 ? '#e74c3c' : '#555';
+}
+
 /* Load saved state */
-chrome.storage.local.get(['enabled', 'urlPrefix', 'blockFloatingMedia'], function (result) {
-  applyState(result.enabled !== false);
-  const raw = result.urlPrefix || '';
-  prefixList.value = raw;
-  showPrefixStatus(parsePrefixes(raw));
-  mediaToggle.checked = result.blockFloatingMedia !== false;
-});
+chrome.storage.local.get(
+  ['enabled', 'urlPrefix', 'blockFloatingMedia', 'blockedSites'],
+  function (result) {
+    applyState(result.enabled !== false);
+    const raw = result.urlPrefix || '';
+    prefixList.value = raw;
+    showPrefixStatus(parsePrefixes(raw));
+    mediaToggle.checked = result.blockFloatingMedia !== false;
+    const blocked = result.blockedSites || '';
+    blockedList.value = blocked;
+    showBlockedStatus(parseBlocked(blocked));
+  }
+);
 
 toggle.addEventListener('change', function () {
   const enabled = toggle.checked;
@@ -73,17 +103,14 @@ toggle.addEventListener('change', function () {
   applyState(enabled);
 });
 
-/* Auto-save when textarea loses focus */
 prefixList.addEventListener('blur', savePrefixes);
 
-/* Add current tab's origin to the list */
 addCurrent.addEventListener('click', function () {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     if (!tabs[0] || !tabs[0].url) return;
     try {
       const origin = new URL(tabs[0].url).origin + '/';
       const existing = prefixList.value.trim();
-      // Check if already in the list
       if (existing.split('\n').some(function (l) { return l.trim() === origin; })) {
         prefixStatus.textContent = 'Already in list';
         prefixStatus.style.color = '#f39c12';
@@ -99,6 +126,14 @@ clearPrefix.addEventListener('click', function () {
   prefixList.value = '';
   chrome.storage.local.set({ urlPrefix: '' });
   showPrefixStatus([]);
+});
+
+blockedList.addEventListener('blur', saveBlocked);
+
+clearBlocked.addEventListener('click', function () {
+  blockedList.value = '';
+  chrome.storage.local.set({ blockedSites: '' });
+  showBlockedStatus([]);
 });
 
 mediaToggle.addEventListener('change', function () {
