@@ -464,9 +464,44 @@
       el.style.setProperty('display', 'none', 'important');
     }
 
+    /* ── Direct cross-origin image/media hiding ──
+       Cross-origin images (GIFs, JPGs, etc.) injected into reading
+       pages are almost always ads. Hide them directly, along with
+       their parent <a> wrapper if it links externally. */
+    function hideAdMedia(el) {
+      if (!el || el.nodeType !== 1 || processed.has(el)) return;
+      /* Cross-origin <img> */
+      if (el.tagName === 'IMG' && el.src && isCrossOrigin(el.src)) {
+        /* If parent is an external <a>, hide the whole link */
+        const parent = el.parentElement;
+        if (parent && parent.tagName === 'A' && isCrossOrigin(parent.href)) {
+          hideEl(parent);
+        } else {
+          hideEl(el);
+        }
+        return;
+      }
+      /* Cross-origin <iframe> outside of overlays */
+      if (el.tagName === 'IFRAME') {
+        const src = el.src || el.getAttribute('src') || '';
+        if (src && src !== 'about:blank' && isCrossOrigin(src)) {
+          hideEl(el);
+          return;
+        }
+      }
+      /* <video> elements */
+      if (el.tagName === 'VIDEO') {
+        hideEl(el);
+        return;
+      }
+    }
+
     function checkEl(el) {
       if (!el || el.nodeType !== 1 || processed.has(el)) return;
       processed.add(el);
+      /* First: hide cross-origin media directly */
+      hideAdMedia(el);
+      /* Then: check for overlay ancestors */
       const overlay = findOverlayRoot(el);
       if (overlay && shouldHide(overlay)) hideEl(overlay);
     }
@@ -478,6 +513,8 @@
     /* Sweep skips processed on CHILDREN so late-styled overlays get caught */
     function sweepEl(el) {
       if (!el || el.nodeType !== 1) return;
+      /* Re-check cross-origin media that may have loaded src after insertion */
+      if (!processed.has(el)) hideAdMedia(el);
       const overlay = findOverlayRoot(el);
       if (overlay && !processed.has(overlay) && shouldHide(overlay)) hideEl(overlay);
     }
