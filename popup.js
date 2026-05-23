@@ -6,9 +6,10 @@ const addCurrent    = document.getElementById('addCurrent');
 const clearPrefix   = document.getElementById('clearPrefix');
 const prefixStatus  = document.getElementById('prefixStatus');
 const mediaToggle   = document.getElementById('mediaToggle');
-const blockedList   = document.getElementById('blockedList');
-const clearBlocked  = document.getElementById('clearBlocked');
-const blockedStatus = document.getElementById('blockedStatus');
+const blockedList       = document.getElementById('blockedList');
+const addCurrentBlocked = document.getElementById('addCurrentBlocked');
+const clearBlocked      = document.getElementById('clearBlocked');
+const blockedStatus     = document.getElementById('blockedStatus');
 
 function applyState(enabled) {
   toggle.checked = enabled;
@@ -129,6 +130,24 @@ clearPrefix.addEventListener('click', function () {
 });
 
 blockedList.addEventListener('blur', saveBlocked);
+
+addCurrentBlocked.addEventListener('click', function () {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (!tabs[0] || !tabs[0].url) return;
+    try {
+      const domain = new URL(tabs[0].url).hostname.toLowerCase();
+      if (!domain) return;
+      const existing = blockedList.value.trim();
+      if (existing.split('\n').some(function (l) { return l.trim() === domain; })) {
+        blockedStatus.textContent = 'Already blocked';
+        blockedStatus.style.color = '#f39c12';
+        return;
+      }
+      blockedList.value = existing ? existing + '\n' + domain : domain;
+      saveBlocked();
+    } catch (e) {}
+  });
+});
 
 clearBlocked.addEventListener('click', function () {
   blockedList.value = '';
